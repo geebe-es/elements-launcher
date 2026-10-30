@@ -1,0 +1,52 @@
+{
+  "launcher": {
+    "version": "0.1.0",
+    "name": "Elements Launcher"
+  },
+  "apps": [
+    {
+      "id": "convertmp3",
+      "name": "ConvertMp3",
+      "description": "Conversor e gerenciador de áudio desktop premium com suporte a múltiplos formatos e extração de áudio.",
+      "longDescription": "O ConvertMp3 é a solução definitiva para quem busca qualidade e rapidez na conversão de arquivos de áudio. Desenvolvido com uma interface moderna e intuitiva, ele permite converter diversos formatos, extrair áudio de vídeos e gerenciar sua biblioteca de mídia local com facilidade.",
+      "category": "Mídia & Áudio",
+      "version": "1.0.4",
+      "releaseDate": "2026-10-25",
+      "icon": "/icons/convertmp3.png",
+      "banner": "/banners/convertmp3.jpg",
+      "downloadUrl": "https://example.com/downloads/ConvertMp3-Setup.exe",
+      "sha256": "placeholder-sha256-hash-convertmp3",
+      "size": "52.4 MB",
+      "requirements": {
+        "os": "Windows 10/11",
+        "arch": "x64"
+      },
+      "changelog": [
+        "v1.0.4 - Melhorias na interface e novas animações.",
+        "v1.0.3 - Correção de bugs na conversão em lote.",
+        "v1.0.0 - Lançamento inicial."
+      ]
+    },
+    {
+      "id": "intasave",
+      "name": "InstaSave",
+      "description": "Ferramenta de download de fotos, vídeos e reels do Instagram com alta qualidade.",
+      "longDescription": "InstaSave facilita a preservação de seus momentos favoritos do Instagram. Basta colar o link da publicação e baixar o conteúdo original em segundos. Respeita a privacidade e as políticas da plataforma, oferecendo uma experiência limpa e segura.",
+      "category": "Social & Download",
+      "version": "1.0.0",
+      "releaseDate": "2026-10-29",
+      "icon": "/icons/intasave.png",
+      "banner": "/banners/intasave.jpg",
+      "downloadUrl": "https://example.com/downloads/InstaSave-Setup.exe",
+      "sha256": "placeholder-sha256-hash-intasave",
+      "size": "15.8 MB",
+      "requirements": {
+        "os": "Windows 10/11",
+        "arch": "x64"
+      },
+      "changelog": [
+        "v1.0.0 - Lançamento oficial como parte do Elements Launcher."
+      ]
+    }
+  ]
+}
