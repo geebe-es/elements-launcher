@@ -6,6 +6,7 @@ interface ScanResult {
   version?: string | null;
   location?: string | null;
   exe?: string | null;
+  uninstaller?: string | null;
 }
 
 export interface UpdaterState {
@@ -52,6 +53,7 @@ declare global {
       scanApps: (apps: { id: string; name: string }[]) => Promise<Record<string, ScanResult>>;
       runInstaller: (filePath: string, silent?: boolean) => Promise<{ ok: boolean; error?: string; openedWizard?: boolean }>;
       openApp: (exePath: string) => Promise<{ ok: boolean; error?: string }>;
+      uninstallApp: (uninstallerPath: string) => Promise<{ ok: boolean; error?: string; openedWizard?: boolean }>;
 
       settingsGet: () => Promise<{ downloadDir: string; autoInstall: boolean } | null>;
       settingsSet: (patch: { autoInstall?: boolean; downloadDir?: string }) => Promise<{ ok: boolean; settings?: { downloadDir: string; autoInstall: boolean } }>;

@@ -16,7 +16,10 @@ const downloadManager = createDownloadManager();
 
 // Encaminha progresso/conclusão/erro/cancelamento dos downloads nativos
 // para todas as janelas (o renderer escuta o canal "native:event").
-downloadManager.events.on("event", (event) => sendToAllWindows(event));
+downloadManager.events.on("event", (event) => {
+  logLine("download:" + event.type, { id: event.id, message: event.message, received: event.received, total: event.total });
+  sendToAllWindows(event);
+});
 
 // --- Auto-update do launcher (electron-updater) ---
 // Estado base: nada foi verificado ainda. Nada é exibido/inventado na UI
@@ -123,6 +126,19 @@ function sendToAllWindows(event) {
   for (const win of BrowserWindow.getAllWindows()) {
     win.webContents.send("native:event", event);
   }
+}
+
+// Log rotativo simples em userData/logs para diagnóstico de downloads/instalação.
+function logLine(kind, data) {
+  try {
+    const dir = path.join(app.getPath("userData"), "logs");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.appendFileSync(
+      path.join(dir, "launcher.log"),
+      new Date().toISOString() + " [" + kind + "] " + JSON.stringify(data).slice(0, 900) + "\n",
+      "utf-8"
+    );
+  } catch {}
 }
 
 app.disableHardwareAcceleration = app.disableHardwareAcceleration; // manter aceleração por padrão
@@ -240,9 +256,60 @@ ipcMain.handle("apps:scan", (_event, apps) => {
   return scanInstalledApps(Array.isArray(apps) ? apps : []);
 });
 
+// Executa um exe silenciosamente (/S); se o manifesto exigir elevação,
+// relança com RunAs (UAC único) e cai para o assistente se o usuário
+// não confirmar. Retorna { code, openedWizard }.
+async function runSilentExe(filePath) {
+  const direct = await new Promise((resolve) => {
+    try {
+      const child = require("node:child_process").spawn(filePath, ["/S"], {
+        windowsHide: true,
+      });
+      child.on("exit", (code) => resolve({ code }));
+      child.on("error", (err) => resolve({ err }));
+    } catch (err) {
+      resolve({ err });
+    }
+  });
+  if (direct && direct.code === 0) return { code: 0, openedWizard: false };
+
+  // Spawn nem iniciou (erro de início = provável exigência de elevação)
+  // → tenta RunAs com UAC único. Código de saída != 0 de um spawn normal
+  // NÃO deve pedir elevação sem necessidade.
+  if (direct && direct.err) {
+    logLine("exe:silent", { via: "spawn", error: String(direct.err.message || direct.err) });
+    try {
+      const args = [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$p = Start-Process -FilePath "${filePath}" -ArgumentList "/S" -Verb RunAs -Wait -PassThru; exit $p.ExitCode`,
+      ];
+      const code = await new Promise((resolve, reject) => {
+        const child = require("node:child_process").spawn("powershell.exe", args, { windowsHide: true });
+        child.on("exit", (code) => resolve(code));
+        child.on("error", reject);
+      });
+      if (code === 0) return { code: 0, openedWizard: false };
+      // UAC cancelado/timeout → fallback: abre o assistente interativo.
+      await shell.openPath(filePath);
+      logLine("exe:silent", { via: "runas", code, fallback: "wizard" });
+      return { code, openedWizard: true };
+    } catch (err) {
+      return { code: -1, error: err && err.message ? err.message : "Falha ao executar." };
+    }
+  }
+
+  if (direct) {
+    logLine("exe:silent", { via: "spawn", code: direct.code });
+  }
+  return { code: direct ? direct.code : -1, openedWizard: false };
+}
+
 // Executa o instalador baixado (após confirmação do usuário na interface).
 // silent=true → roda o NSIS em modo silencioso (/S) e espera a conclusão.
 ipcMain.handle("installer:run", async (_event, filePath, silent) => {
+  logLine("installer:run", { filePath, silent });
   if (typeof filePath !== "string" || !filePath.toLowerCase().endsWith(".exe")) {
     return { ok: false, error: "Arquivo de instalador inválido." };
   }
@@ -253,52 +320,15 @@ ipcMain.handle("installer:run", async (_event, filePath, silent) => {
   if (!exists) return { ok: false, error: "O instalador não existe mais no disco." };
 
   if (silent === true) {
-    // 1ª tentativa: spawn direto silencioso (funciona quando o instalador
-    // não exige elevação).
-    const direct = await new Promise((resolve) => {
-      try {
-        const child = require("node:child_process").spawn(filePath, ["/S"], {
-          windowsHide: true,
-        });
-        child.on("exit", (code) => resolve({ code }));
-        child.on("error", (err) => resolve({ err }));
-      } catch (err) {
-        resolve({ err });
-      }
-    });
-    if (direct && direct.code === 0) return { ok: true };
-
-    // Instalador exige UAC (manifesto requireAdministrator): relança via
-    // ShellExecute com RunAs — aparece UMA solicitação do Controle de Conta
-    // de Usuário; após o "Sim", a instalação continua silenciosa (/S).
-    try {
-      const args = [
-        "-NoProfile",
-        "-NonInteractive",
-        "-Command",
-        `$p = Start-Process -FilePath "${filePath}" -ArgumentList "/S" -Verb RunAs -Wait -PassThru; exit $p.ExitCode`,
-      ];
-      const code = await new Promise((resolve, reject) => {
-        const child = require("node:child_process").spawn(
-          "powershell.exe",
-          args,
-          { windowsHide: true }
-        );
-        child.on("exit", (code) => resolve(code));
-        child.on("error", reject);
-      });
-      if (code === 0) return { ok: true };
-      // UAC cancelado/timeout → fallback: abre o assistente interativo
-      // (o arquivo já está baixado e verificado; nada é re-baixado).
-      await shell.openPath(filePath);
-      return {
-        ok: false,
-        openedWizard: true,
-        error: "Instalador aberto no modo assistente (UAC não confirmado).",
-      };
-    } catch (err) {
-      return { ok: false, error: err && err.message ? err.message : "Falha ao executar o instalador." };
-    }
+    const res = await runSilentExe(filePath);
+    if (res.code === 0) { logLine("installer:silent", { ok: true }); return { ok: true }; }
+    await shell.openPath(filePath).catch(() => {});
+    logLine("installer:silent", { ok: false, openedWizard: true });
+    return {
+      ok: false,
+      openedWizard: true,
+      error: "Instalador aberto no modo assistente (instalação silenciosa não confirmada).",
+    };
   }
 
   try {
@@ -320,6 +350,30 @@ ipcMain.handle("app:open", async (_event, exePath) => {
   } catch (err) {
     return { ok: false, error: err.message };
   }
+});
+
+// Desinstala um aplicativo usando o desinstalador oficial registrado
+// no Windows (modo silencioso; RunAs/UAC quando necessário, com
+// fallback para o assistente).
+ipcMain.handle("app:uninstall", async (_event, uninstallerPath) => {
+  logLine("app:uninstall", { uninstallerPath });
+  if (typeof uninstallerPath !== "string" || !uninstallerPath.toLowerCase().endsWith(".exe")) {
+    return { ok: false, error: "Desinstalador inválido." };
+  }
+  const exists = await fs.promises
+    .access(uninstallerPath)
+    .then(() => true)
+    .catch(() => false);
+  if (!exists) return { ok: false, error: "O desinstalador não foi encontrado no disco." };
+
+  const res = await runSilentExe(uninstallerPath);
+  if (res.error) return { ok: false, error: res.error };
+  if (res.code === 0) return { ok: true, openedWizard: false };
+  if (res.openedWizard) {
+    // Assistente aberto: o usuário conclui manualmente.
+    return { ok: true, openedWizard: true };
+  }
+  return { ok: false, error: "O desinstalador saiu com o código " + res.code + "." };
 });
 
 // --- IPC: configurações ---

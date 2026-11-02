@@ -90,10 +90,12 @@ async function matchRegistryForName(appId, displayName) {
     }
     candidates.sort((a, b) => Number(b.exact) - Number(a.exact) || a.len - b.len);
     for (const { keyPath } of candidates) {
-      const [displayIcon, displayVersion, location] = await Promise.all([
+      const [displayIcon, displayVersion, location, uninstallString, quietUninstallString] = await Promise.all([
         getEntryValue(keyPath, "DisplayIcon"),
         getEntryValue(keyPath, "DisplayVersion"),
         getEntryValue(keyPath, "InstallLocation"),
+        getEntryValue(keyPath, "UninstallString"),
+        getEntryValue(keyPath, "QuietUninstallString"),
       ]);
 
       let exe = await findMainExe(location || "", displayName);
@@ -110,12 +112,27 @@ async function matchRegistryForName(appId, displayName) {
         }
       }
 
+      // Desinstalador oficial (preferência pelo modo silencioso).
+      const rawUninstaller = quietUninstallString || uninstallString || null;
+      let uninstaller = null;
+      if (rawUninstaller) {
+        // "C:\...\Uninstall X.exe" /S → extrai só o caminho do exe.
+        const exeMatch = rawUninstaller.match(/"([^"]+\.exe)"/i) || rawUninstaller.match(/^(\S+\.exe)/i);
+        if (exeMatch && fs.existsSync(exeMatch[1])) uninstaller = exeMatch[1];
+      }
+      if (!uninstaller && exe) {
+        // Instaladores NSIS padrão (electron-builder) deixam "Uninstall <App>.exe" ao lado.
+        const nsisUn = path.join(path.dirname(exe), "Uninstall " + displayName + ".exe");
+        if (fs.existsSync(nsisUn)) uninstaller = nsisUn;
+      }
+
       return {
         appId,
         installed: true,
         version: displayVersion || null,
         location: location || null,
         exe: exe || null,
+        uninstaller,
         source: "registry",
       };
     }
@@ -142,7 +159,10 @@ async function scanInstalledApps(apps) {
       if (fs.existsSync(candidate)) {
         const exe = await findMainExe(candidate, app.name);
         if (exe) {
-          result = { appId: id, installed: true, version: null, location: candidate, exe, source: "filesystem" };
+          const nsisUn = path.join(candidate, "Uninstall " + name + ".exe");
+          const genericUn = path.join(candidate, "uninstall.exe");
+          const uninstaller = fs.existsSync(nsisUn) ? nsisUn : fs.existsSync(genericUn) ? genericUn : null;
+          result = { appId: id, installed: true, version: null, location: candidate, exe, uninstaller, source: "filesystem" };
         }
       }
     }

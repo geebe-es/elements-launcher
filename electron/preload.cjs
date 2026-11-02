@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   scanApps: (apps) => ipcRenderer.invoke("apps:scan", apps),
   runInstaller: (filePath, silent) => ipcRenderer.invoke("installer:run", filePath, silent === true),
   openApp: (exePath) => ipcRenderer.invoke("app:open", exePath),
+  uninstallApp: (uninstallerPath) => ipcRenderer.invoke("app:uninstall", uninstallerPath),
 
   // Configurações
   settingsGet: () => ipcRenderer.invoke("settings:get"),

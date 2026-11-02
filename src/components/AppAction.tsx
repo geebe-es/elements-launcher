@@ -17,14 +17,15 @@ export function AppStatusBadge({ app }: { app: AppInfo }) {
     downloaded: { text: "Baixado", className: "label-sky" },
     installing: { text: "Instalando...", className: "label-amber" },
     installed: { text: "Instalado", className: "label-green" },
+    uninstalling: { text: "Desinstalando...", className: "label-amber" },
     updateAvailable: { text: "Atualização disponível", className: "label-sky" },
     error: { text: "Erro", className: "label-red" },
   };
   const label = labels[status] || labels.available;
 
   return (
-    <div className={`status-badge ${label.className}`}>
-      {status === "downloading" || status === "installing" ? (
+    <div className={`status-badge ${label.className}`} title={status === "error" && st?.error ? st.error : undefined}>
+      {status === "downloading" || status === "installing" || status === "uninstalling" ? (
         <span className="mini-spinner" aria-hidden="true" />
       ) : (
         <span className={`status-dot`} aria-hidden="true" />
@@ -65,7 +66,7 @@ export function AppProgressBar({ app }: { app: AppInfo }) {
 }
 
 export function AppActionButton({ app, compact = false }: { app: AppInfo; compact?: boolean }) {
-  const { states, download, cancel, requestInstall, openApp } = useLauncher();
+  const { states, download, cancel, requestInstall, uninstallApp, openApp } = useLauncher();
   const st: AppRuntimeState | undefined = states[app.id];
   const status = st?.status ?? "available";
   const className = compact ? "btn-sm" : "btn-action";
@@ -96,8 +97,23 @@ export function AppActionButton({ app, compact = false }: { app: AppInfo; compac
       );
     case "installed":
       return (
-        <button className={className} onClick={() => openApp(app)}>
-          Abrir
+        <div className={`action-group${compact ? " compact" : ""}`}>
+          <button className={className} onClick={() => openApp(app)}>
+            Abrir
+          </button>
+          <button
+            className={`${className} btn-soft btn-danger-soft`}
+            onClick={() => uninstallApp(app)}
+            title="Desinstalar este aplicativo"
+          >
+            Desinstalar
+          </button>
+        </div>
+      );
+    case "uninstalling":
+      return (
+        <button className={`${className} btn-soft`} disabled>
+          Desinstalando...
         </button>
       );
     case "error":

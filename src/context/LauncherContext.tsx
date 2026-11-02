@@ -7,6 +7,7 @@ export type AppStatus =
   | "downloaded" // Download concluído (aguardando instalação)
   | "installing" // Instalador em execução
   | "installed" // Detectado como instalado
+  | "uninstalling" // Desinstalador em execução
   | "updateAvailable"
   | "error";
 
@@ -18,6 +19,7 @@ export interface AppRuntimeState {
   filePath: string | null;
   installedVersion: string | null;
   exePath: string | null;
+  uninstallerPath: string | null;
   error?: string;
   shaVerified?: boolean;
 }
@@ -42,6 +44,7 @@ interface LauncherContextValue {
   download: (app: AppInfo) => void;
   cancel: (app: AppInfo) => void;
   requestInstall: (app: AppInfo, filePath: string | null, shaVerified: boolean) => void;
+  uninstallApp: (app: AppInfo) => void;
   openApp: (app: AppInfo) => void;
   scan: () => void;
   lastScan: Date | null;
@@ -69,6 +72,7 @@ function baseState(): AppRuntimeState {
     filePath: null,
     installedVersion: null,
     exePath: null,
+    uninstallerPath: null,
   };
 }
 
@@ -130,7 +134,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
             ...(before || {}),
             // Só troca o status se não houver operação em andamento
             status:
-              before && (before.status === "downloading" || before.status === "installing")
+              before && (before.status === "downloading" || before.status === "installing" || before.status === "uninstalling")
                 ? before.status
                 : result?.installed
                   ? "installed"
@@ -139,6 +143,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
                     : "available",
             installedVersion: result?.version ?? null,
             exePath: result?.exe ?? null,
+            uninstallerPath: result?.uninstaller ?? null,
           };
         }
         return next;
@@ -186,6 +191,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
                 status: "installed",
                 installedVersion: r.version ?? null,
                 exePath: r.exe ?? null,
+                uninstallerPath: r.uninstaller ?? null,
                 received: 0,
                 total: null,
                 progress: 0,
@@ -243,6 +249,54 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     setConfirm({ app, filePath, shaVerified });
   };
 
+  // Desinstala com o desinstalador oficial registrado no Windows
+  // (silencioso; RunAs/UAC único quando o manifesto pedir; assistente
+  // como fallback). No fim, re-infere o estado pela varredura.
+  const uninstallApp = async (app: AppInfo) => {
+    if (!API?.uninstallApp) {
+      window.alert("Desinstalar exige o app desktop (Electron).");
+      return;
+    }
+    const st = statesRef.current[app.id];
+    const uninstaller = st?.uninstallerPath;
+    if (!uninstaller) {
+      window.alert(
+        `Não foi possível localizar o desinstalador do ${app.name}.\nRemova pelo "Adicionar ou remover programas" do Windows.`
+      );
+      return;
+    }
+    if (!window.confirm(`Desinstalar o ${app.name} deste computador?\n\nO aplicativo será removido e voltará a aparecer como "Disponível".`)) {
+      return;
+    }
+    updateStatus(app.id, { status: "uninstalling" });
+    const res = await API.uninstallApp(uninstaller);
+    if (res?.ok) {
+      if (!res.openedWizard) {
+        // Silencioso concluído → recomputa imediatamente.
+        const results = await API.scanApps?.(APPS.map((a) => ({ id: a.id, name: a.name })));
+        const r = results?.[app.id];
+        updateStatus(app.id, {
+          status: r?.installed ? "installed" : "available",
+          installedVersion: r?.version ?? null,
+          exePath: r?.exe ?? null,
+          uninstallerPath: r?.uninstaller ?? null,
+          received: 0,
+          total: null,
+          progress: 0,
+        });
+        if (r?.installed) {
+          window.alert(
+            `O ${app.name} ainda foi detectado após a desinstalação — pode ter sido reinstalado ou há outra variante instalada.`
+          );
+        }
+      }
+      // openedWizard=true: o assistente roda com o usuário; o estado será
+      // recomputado na próxima varredura/abertura do app.
+    } else {
+      updateStatus(app.id, { status: "error", error: res?.error || "Falha na desinstalação." });
+    }
+  };
+
   // Enquanto o assistente interativo roda (fallback do UAC), vigiamos o
   // registro/disco a cada 10s para marcar "Instalado" assim que detectar.
   const startInstallWatchdog = (id: string) => {
@@ -260,6 +314,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           status: "installed",
           installedVersion: r.version ?? null,
           exePath: r.exe ?? null,
+                uninstallerPath: r.uninstaller ?? null,
           received: 0,
           total: null,
           progress: 0,
@@ -284,7 +339,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       exe = results[app.id]?.exe ?? null;
       setStates((prev) => ({
         ...prev,
-        [app.id]: { ...baseState(), ...(prev[app.id] || {}), exePath: exe },
+        [app.id]: { ...baseState(), ...(prev[app.id] || {}), exePath: exe, uninstallerPath: results?.[app.id]?.uninstaller ?? prev[app.id]?.uninstallerPath ?? null },
       }));
     }
     if (!exe) {
@@ -318,6 +373,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       download,
       cancel,
       requestInstall,
+      uninstallApp,
       openApp,
       scan,
       lastScan,
