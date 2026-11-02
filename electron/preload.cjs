@@ -19,13 +19,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     return () => ipcRenderer.removeListener("native:event", listener);
   },
 
-  // Instalações / execução
+  // Instalações / execução (silent=true → NSIS /S e espera a conclusão)
   scanApps: (apps) => ipcRenderer.invoke("apps:scan", apps),
-  runInstaller: (filePath) => ipcRenderer.invoke("installer:run", filePath),
+  runInstaller: (filePath, silent) => ipcRenderer.invoke("installer:run", filePath, silent === true),
   openApp: (exePath) => ipcRenderer.invoke("app:open", exePath),
 
   // Configurações
   settingsGet: () => ipcRenderer.invoke("settings:get"),
+  settingsSet: (patch) => ipcRenderer.invoke("settings:set", patch),
   settingsChooseDownloadDir: () => ipcRenderer.invoke("settings:chooseDownloadDir"),
 
   // Auto-update do launcher

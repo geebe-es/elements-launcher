@@ -48,6 +48,8 @@ interface LauncherContextValue {
   confirm: ConfirmRequest | null;
   setConfirm: (value: ConfirmRequest | null) => void;
   updateStatus: (id: string, patch: Partial<AppRuntimeState>) => void;
+  autoInstall: boolean;
+  setAutoInstall: (value: boolean) => void;
   updater: UpdaterSnapshot;
   updaterCheck: () => void;
   updaterDownload: () => void;
@@ -83,6 +85,21 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   });
   const statesRef = useRef(states);
   statesRef.current = states;
+
+  // Instalação automática após download (persistida nas configurações)
+  const [autoInstall, setAutoInstallState] = useState(true);
+  const autoInstallRef = useRef(autoInstall);
+  autoInstallRef.current = autoInstall;
+
+  useEffect(() => {
+    window.electronAPI?.settingsGet?.().then((s) => setAutoInstallState(s?.autoInstall !== false));
+  }, []);
+
+  const setAutoInstall = (value: boolean) => {
+    setAutoInstallState(value);
+    autoInstallRef.current = value;
+    window.electronAPI?.settingsSet?.({ autoInstall: value }).catch(() => {});
+  };
 
   // Estado inicial do updater (pode já ter estado oferecido de sessões anteriores)
   useEffect(() => {
@@ -140,7 +157,7 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
   // Eventos nativos de download
   useEffect(() => {
     if (!API?.onNativeEvent) return;
-    const off = API.onNativeEvent((event: unknown) => {
+    const off = API.onNativeEvent(async (event: unknown) => {
       const data = event as { type: string; id: string; [k: string]: unknown };
       const { type, id } = data;
       if (type === "progress") {
@@ -153,11 +170,47 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           progress: total ? Math.min(100, (received / total) * 100) : 0,
         });
       } else if (type === "done") {
+        const filePath = typeof data.path === "string" ? data.path : null;
+        const shaVerified = Boolean(data.sha256Verified);
+
+        // Instalação automática: download concluído com hash verificado →
+        // roda o instalador NSIS em modo silencioso e reescaneia ao final.
+        if (autoInstallRef.current && filePath && shaVerified && API?.runInstaller) {
+          updateStatus(id, { status: "installing", progress: 100, filePath, shaVerified });
+          const res = await API.runInstaller(filePath, true);
+          if (res?.ok) {
+            const results = await API.scanApps?.(APPS.map((a) => ({ id: a.id, name: a.name })));
+            const r = results?.[id];
+            if (r?.installed) {
+              updateStatus(id, {
+                status: "installed",
+                installedVersion: r.version ?? null,
+                exePath: r.exe ?? null,
+                received: 0,
+                total: null,
+                progress: 0,
+              });
+            } else {
+              updateStatus(id, {
+                status: "error",
+                error: "Instalador executado, mas a instalação não foi detectada na varredura.",
+              });
+            }
+          } else if (res?.openedWizard) {
+            // UAC não confirmado: o assistente foi aberto — vigiamos até o
+            // usuário concluir (ou erro após 5 min).
+            startInstallWatchdog(id);
+          } else {
+            updateStatus(id, { status: "error", error: res?.error || "Falha na instalação automática." });
+          }
+          return;
+        }
+
         updateStatus(id, {
           status: "downloaded",
           progress: 100,
-          filePath: (data.path as string) || null,
-          shaVerified: Boolean(data.sha256Verified),
+          filePath,
+          shaVerified,
         });
       } else if (type === "error") {
         updateStatus(id, { status: "error", error: String(data.message) });
@@ -190,8 +243,38 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     setConfirm({ app, filePath, shaVerified });
   };
 
-  const openApp = async (app: AppInfo) => {
-    if (!API?.openApp) {
+  // Enquanto o assistente interativo roda (fallback do UAC), vigiamos o
+  // registro/disco a cada 10s para marcar "Instalado" assim que detectar.
+  const startInstallWatchdog = (id: string) => {
+    const startedAt = Date.now();
+    const timer = setInterval(async () => {
+      if (!API?.scanApps) {
+        clearInterval(timer);
+        return;
+      }
+      const results = await API.scanApps(APPS.map((a) => ({ id: a.id, name: a.name })));
+      const r = results?.[id];
+      if (r?.installed) {
+        clearInterval(timer);
+        updateStatus(id, {
+          status: "installed",
+          installedVersion: r.version ?? null,
+          exePath: r.exe ?? null,
+          received: 0,
+          total: null,
+          progress: 0,
+        });
+      } else if (Date.now() - startedAt > 5 * 60_000) {
+        clearInterval(timer);
+        updateStatus(id, {
+          status: "error",
+          error: "Instalação não detectada automaticamente. Clique em Instalar e siga o assistente.",
+        });
+      }
+    }, 10_000);
+  };
+
+  const openApp = async (app: AppInfo) => {    if (!API?.openApp) {
       window.alert("Abrir aplicativos exige o app desktop (Electron).");
       return;
     }
@@ -241,6 +324,8 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       confirm,
       setConfirm,
       updateStatus,
+      autoInstall,
+      setAutoInstall,
       updater,
       updaterCheck,
       updaterDownload,

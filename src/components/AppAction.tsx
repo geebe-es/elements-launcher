@@ -101,6 +101,17 @@ export function AppActionButton({ app, compact = false }: { app: AppInfo; compac
         </button>
       );
     case "error":
+      if (st?.filePath) {
+        return (
+          <button
+            className={className}
+            onClick={() => requestInstall(app, st.filePath ?? null, st.shaVerified ?? false)}
+            title={st?.error || "Erro no download"}
+          >
+            Instalar com assistente
+          </button>
+        );
+      }
       return (
         <button className={`${className} btn-soft`} onClick={() => download(app)} title={st?.error || "Erro no download"}>
           Tentar novamente

@@ -241,7 +241,8 @@ ipcMain.handle("apps:scan", (_event, apps) => {
 });
 
 // Executa o instalador baixado (após confirmação do usuário na interface).
-ipcMain.handle("installer:run", async (_event, filePath) => {
+// silent=true → roda o NSIS em modo silencioso (/S) e espera a conclusão.
+ipcMain.handle("installer:run", async (_event, filePath, silent) => {
   if (typeof filePath !== "string" || !filePath.toLowerCase().endsWith(".exe")) {
     return { ok: false, error: "Arquivo de instalador inválido." };
   }
@@ -250,6 +251,56 @@ ipcMain.handle("installer:run", async (_event, filePath) => {
     .then(() => true)
     .catch(() => false);
   if (!exists) return { ok: false, error: "O instalador não existe mais no disco." };
+
+  if (silent === true) {
+    // 1ª tentativa: spawn direto silencioso (funciona quando o instalador
+    // não exige elevação).
+    const direct = await new Promise((resolve) => {
+      try {
+        const child = require("node:child_process").spawn(filePath, ["/S"], {
+          windowsHide: true,
+        });
+        child.on("exit", (code) => resolve({ code }));
+        child.on("error", (err) => resolve({ err }));
+      } catch (err) {
+        resolve({ err });
+      }
+    });
+    if (direct && direct.code === 0) return { ok: true };
+
+    // Instalador exige UAC (manifesto requireAdministrator): relança via
+    // ShellExecute com RunAs — aparece UMA solicitação do Controle de Conta
+    // de Usuário; após o "Sim", a instalação continua silenciosa (/S).
+    try {
+      const args = [
+        "-NoProfile",
+        "-NonInteractive",
+        "-Command",
+        `$p = Start-Process -FilePath "${filePath}" -ArgumentList "/S" -Verb RunAs -Wait -PassThru; exit $p.ExitCode`,
+      ];
+      const code = await new Promise((resolve, reject) => {
+        const child = require("node:child_process").spawn(
+          "powershell.exe",
+          args,
+          { windowsHide: true }
+        );
+        child.on("exit", (code) => resolve(code));
+        child.on("error", reject);
+      });
+      if (code === 0) return { ok: true };
+      // UAC cancelado/timeout → fallback: abre o assistente interativo
+      // (o arquivo já está baixado e verificado; nada é re-baixado).
+      await shell.openPath(filePath);
+      return {
+        ok: false,
+        openedWizard: true,
+        error: "Instalador aberto no modo assistente (UAC não confirmado).",
+      };
+    } catch (err) {
+      return { ok: false, error: err && err.message ? err.message : "Falha ao executar o instalador." };
+    }
+  }
+
   try {
     const result = await shell.openPath(filePath);
     return { ok: result === "" };
@@ -274,7 +325,15 @@ ipcMain.handle("app:open", async (_event, exePath) => {
 // --- IPC: configurações ---
 ipcMain.handle("settings:get", () => ({
   downloadDir: getDownloadDir(),
+  // Padrão: instalar automaticamente após o download (opta-se por 1 clique).
+  autoInstall: readSettings().autoInstall !== false,
 }));
+
+ipcMain.handle("settings:set", (_event, patch) => {
+  if (!patch || typeof patch !== "object") return { ok: false };
+  const next = writeSettings(patch);
+  return { ok: true, settings: { downloadDir: getDownloadDir(), autoInstall: next.autoInstall !== false } };
+});
 
 // --- IPC: auto-update do launcher ---
 ipcMain.handle("app:info", () => ({ version: app.getVersion() }));

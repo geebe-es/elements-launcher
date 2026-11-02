@@ -44,7 +44,9 @@ async function regListKeys(baseKey) {
   if (!output) return [];
   const keys = [];
   for (const line of output.split(/\r?\n/)) {
-    const match = line.trim().match(/^(HKEY_[A-Z0-9\\_]+)$/i);
+    // Aceita qualquer formato de nome de chave (GUID, espaços, hífen) —
+    // instaladores usam todo tipo de sufixo (_is1, chaves com GUID...).
+    const match = line.trim().match(/^(HKEY_.+)$/i);
     if (match) keys.push(match[1]);
   }
   return keys;
@@ -73,12 +75,21 @@ async function findMainExe(installLocation, productName) {
 async function matchRegistryForName(appId, displayName) {
   for (const base of UNINSTALL_KEYS) {
     const keys = await regListKeys(base);
+    const targetClean = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!targetClean) continue;
+    const candidates = [];
     for (const keyPath of keys) {
       const name = await getEntryValue(keyPath, "DisplayName");
       if (!name) continue;
       const nameClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const targetClean = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
-      if (!targetClean || !nameClean.includes(targetClean)) continue;
+      if (!nameClean.includes(targetClean)) continue;
+      // Preferência: correspondência exata e nome mais curto ("InstaSave"
+      // vence "InstaSave Admin" quando ambos existirem).
+      const exact = nameClean === targetClean || nameClean.startsWith(targetClean);
+      candidates.push({ keyPath, exact, len: nameClean.length });
+    }
+    candidates.sort((a, b) => Number(b.exact) - Number(a.exact) || a.len - b.len);
+    for (const { keyPath } of candidates) {
       const [displayIcon, displayVersion, location] = await Promise.all([
         getEntryValue(keyPath, "DisplayIcon"),
         getEntryValue(keyPath, "DisplayVersion"),
@@ -117,7 +128,7 @@ async function scanInstalledApps(apps) {
   const results = {};
   for (const app of apps) {
     const { id, name } = app;
-    if (!id || !name) return;
+    if (!id || !name) continue;
     let result;
     try {
       result = await matchRegistryForName(id, name);

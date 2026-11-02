@@ -50,10 +50,11 @@ declare global {
       onNativeEvent: (callback: (event: NativeDownloadEvent) => void) => () => void;
 
       scanApps: (apps: { id: string; name: string }[]) => Promise<Record<string, ScanResult>>;
-      runInstaller: (filePath: string) => Promise<{ ok: boolean; error?: string }>;
+      runInstaller: (filePath: string, silent?: boolean) => Promise<{ ok: boolean; error?: string; openedWizard?: boolean }>;
       openApp: (exePath: string) => Promise<{ ok: boolean; error?: string }>;
 
-      settingsGet: () => Promise<{ downloadDir: string } | null>;
+      settingsGet: () => Promise<{ downloadDir: string; autoInstall: boolean } | null>;
+      settingsSet: (patch: { autoInstall?: boolean; downloadDir?: string }) => Promise<{ ok: boolean; settings?: { downloadDir: string; autoInstall: boolean } }>;
       settingsChooseDownloadDir: () => Promise<{ ok: boolean; dir?: string }>;
 
       updaterState: () => Promise<UpdaterState>;

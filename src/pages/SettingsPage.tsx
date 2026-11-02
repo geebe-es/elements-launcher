@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 import { useLauncher } from "../context/LauncherContext";
 
 export default function SettingsPage() {
-  const { scan, updater, updaterCheck } = useLauncher();
+  const { scan, updater, updaterCheck, autoInstall, setAutoInstall } = useLauncher();
   const [downloadDir, setDownloadDir] = useState<string | null>(null);
+  const [appVersion, setAppVersion] = useState<string>("");
 
   useEffect(() => {
     window.electronAPI?.settingsGet?.().then((s?: { downloadDir?: string } | null) => setDownloadDir(s?.downloadDir ?? null));
+    window.electronAPI?.appInfo?.().then((info?: { version?: string } | null) => setAppVersion(info?.version ?? ""));
   }, []);
 
   const chooseDownloadDir = async () => {
@@ -38,6 +40,23 @@ export default function SettingsPage() {
             </div>
             <button className="btn-outline" onClick={chooseDownloadDir}>
               Alterar
+            </button>
+          </div>
+
+          <div className="setting-row">
+            <div>
+              <h4>Instalar automaticamente após baixar</h4>
+              <p>
+                Quando ativado: ao concluir o download (com hash SHA-256 verificado), o instalador é
+                executado em modo silencioso e o aplicativo já aparece como instalado — sem cliques extras.
+              </p>
+            </div>
+            <button
+              className={autoInstall ? "btn-action" : "btn-outline"}
+              onClick={() => setAutoInstall(!autoInstall)}
+              title={autoInstall ? "Clique para desativar" : "Clique para ativar"}
+            >
+              {autoInstall ? "Ativado" : "Desativado"}
             </button>
           </div>
 
@@ -77,7 +96,7 @@ export default function SettingsPage() {
               <h4>Diagnóstico</h4>
               <p>Electron {navigator.userAgent.includes("Electron") ? navigator.userAgent.match(/Electron\/([\d.]+)/)?.[1] ?? "" : "n/d (navegador)"} · React · Windows {navigator.platform}</p>
             </div>
-            <span className="version-tag">v1.0.0</span>
+            <span className="version-tag">{appVersion ? `v${appVersion}` : "—"}</span>
           </div>
         </div>
       </div>
