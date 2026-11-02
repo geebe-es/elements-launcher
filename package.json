@@ -2,7 +2,7 @@
   "name": "elements-launcher",
   "productName": "Elements Launcher",
   "private": true,
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "Central de aplicativos do Elements — baixe, instale e gerencie seus apps em um só lugar.",
   "main": "electron/main.cjs",
   "type": "module",
@@ -55,7 +55,8 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Elements-Launcher-Setup.exe"
+      "artifactName": "Elements-Launcher-Setup.exe",
+      "include": "build/installer.nsh"
     },
     "portable": {
       "artifactName": "Elements-Launcher-Portable.exe"

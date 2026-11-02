@@ -1,55 +1,72 @@
-// Detecção de aplicativos instalados no Windows.
-// Consulta chaves de desinstalação (HKLM / HKLM Wow6432Node / HKCU) e
-// pastas padrão de instalação por usuário, sem inventar resultados:
-// se nada for encontrado, o app é reportado como não instalado.
+// ============================================================================
+//  Detecção de aplicativos instalados no Windows.
+//  - Uma única execução de `reg query <Hive>\...\Uninstall /s` por seção do
+//    registro (HKLM, HKLM\Wow6432Node, HKCU) — em vez de dezenas de chamadas
+//    — e um parser que extrai DisplayName/Version/Location/Icon/Uninstall.
+//  - Se nada for encontrado, o app é reportado como não instalado (honesto).
+//  - Também devolve o `uninstaller` oficial para o botão Desinstalar.
+// ============================================================================
 const { execFile } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
 const UNINSTALL_KEYS = [
-  "HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-  "HKLM\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
-  "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+  "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+  "HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
+  "HKEY_CURRENT_USER\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall",
 ];
 
-function regQuery(args) {
+function executeCommand(args) {
   return new Promise((resolve) => {
-    execFile("reg", ["query", ...args], { windowsHide: true, timeout: 10000 }, (err, stdout) => {
+    execFile("reg", ["query", ...args], { windowsHide: true, timeout: 20000, maxBuffer: 8 * 1024 * 1024 }, (err, stdout) => {
       resolve(err ? null : stdout || "");
     });
   });
 }
 
-function runRegQueryPromise(args) {
-  return new Promise((resolve) => {
-    execFile("reg", ["query", args.key, ...(["/v", args.value])], { windowsHide: true, timeout: 8000 }, (err, stdout) => {
-      resolve({ err, stdout: stdout || "" });
-    });
-  });
+// Executa `reg query <base> /s` e devolve um mapa: caminho completo da chave -> valores.
+async function readUninstallEntries(base) {
+  const out = await executeCommand([base, "/s"]);
+  const map = new Map();
+  if (!out) return map;
+  let currentKey = null;
+  let currentVals = null;
+  const valueLine = /^\s*([^!]+?)\s+REG_(?:SZ|EXPAND_SZ|MULTI_SZ)\s+(.*)$/i;
+  for (const rawLine of out.split(/\r?\n/)) {
+    const line = rawLine.replace(/\0/g, "").trimEnd();
+    if (!line.trim()) {
+      currentKey = null;
+      currentVals = null;
+      continue;
+    }
+    if (/^[Hh][Kk][Ee][Yy]_/.test(line.trim())) {
+      currentKey = line.trim();
+      currentVals = {};
+      map.set(currentKey, currentVals);
+      continue;
+    }
+    if (currentKey && currentVals) {
+      const m = line.match(valueLine);
+      if (m) currentVals[m[1].trim()] = m[2].trim();
+    }
+  }
+  return map;
 }
 
-async function getEntryValue(keyPath, value) {
-  const { err, stdout } = await runRegQueryPromise({ key: keyPath, value });
-  if (err) return null;
-  const regex = new RegExp("^\\s*" + value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s+REG_(SZ|EXPAND_SZ)\\s+(.*)$", "i");
-  for (const line of stdout.split(/\r?\n/)) {
-    const match = line.match(regex);
-    if (match) return match[2].trim();
-  }
-  return null;
-}
+let entriesCache = null;
+let entriesCacheAt = 0;
 
-async function regListKeys(baseKey) {
-  const output = await regQuery([baseKey]);
-  if (!output) return [];
-  const keys = [];
-  for (const line of output.split(/\r?\n/)) {
-    // Aceita qualquer formato de nome de chave (GUID, espaços, hífen) —
-    // instaladores usam todo tipo de sufixo (_is1, chaves com GUID...).
-    const match = line.trim().match(/^(HKEY_.+)$/i);
-    if (match) keys.push(match[1]);
+// Cache curto para a varredura em sequência (re-instalação chama a varredura 2×).
+async function getEntries() {
+  const now = Date.now();
+  if (entriesCache && now - entriesCacheAt < 3000) return entriesCache;
+  const combined = [];
+  for (const base of UNINSTALL_KEYS) {
+    combined.push(await readUninstallEntries(base));
   }
-  return keys;
+  entriesCache = combined;
+  entriesCacheAt = now;
+  return combined;
 }
 
 // Procura o executável principal do aplicativo na pasta de instalação.
@@ -58,7 +75,6 @@ async function findMainExe(installLocation, productName) {
   try {
     const entries = await fs.promises.readdir(installLocation, { withFileTypes: true });
     const target = productName.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
-    // 1ª passada: nome esperado
     for (const entry of entries) {
       if (entry.isFile() && entry.name.toLowerCase().endsWith(".exe")) {
         if (entry.name.replace(/[^A-Za-z0-9]/g, "").toLowerCase() === target) {
@@ -72,71 +88,68 @@ async function findMainExe(installLocation, productName) {
   return null;
 }
 
+function extractExePath(value) {
+  if (!value) return null;
+  const exeMatch = value.match(/"([^"]+\.exe[^"]*)"/i) || value.match(/^(\S+?\.exe)/i);
+  return exeMatch ? exeMatch[1] : null;
+}
+
 async function matchRegistryForName(appId, displayName) {
-  for (const base of UNINSTALL_KEYS) {
-    const keys = await regListKeys(base);
-    const targetClean = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
-    if (!targetClean) continue;
-    const candidates = [];
-    for (const keyPath of keys) {
-      const name = await getEntryValue(keyPath, "DisplayName");
+  const hives = await getEntries();
+  const targetClean = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
+  if (!targetClean) return { appId, installed: false };
+
+  const candidates = [];
+  for (const hive of hives) {
+    for (const [keyPath, vals] of hive) {
+      const name = vals.DisplayName;
       if (!name) continue;
       const nameClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
       if (!nameClean.includes(targetClean)) continue;
-      // Preferência: correspondência exata e nome mais curto ("InstaSave"
-      // vence "InstaSave Admin" quando ambos existirem).
-      const exact = nameClean === targetClean || nameClean.startsWith(targetClean);
-      candidates.push({ keyPath, exact, len: nameClean.length });
+      // Preferência: nome exato/menos sufixo ("IntaSave" vence "IntaSave Admin").
+      const exact = nameClean === targetClean;
+      candidates.push({ keyPath, vals, nameClean, exact, len: nameClean.length });
     }
-    candidates.sort((a, b) => Number(b.exact) - Number(a.exact) || a.len - b.len);
-    for (const { keyPath } of candidates) {
-      const [displayIcon, displayVersion, location, uninstallString, quietUninstallString] = await Promise.all([
-        getEntryValue(keyPath, "DisplayIcon"),
-        getEntryValue(keyPath, "DisplayVersion"),
-        getEntryValue(keyPath, "InstallLocation"),
-        getEntryValue(keyPath, "UninstallString"),
-        getEntryValue(keyPath, "QuietUninstallString"),
-      ]);
+  }
+  candidates.sort((a, b) => Number(b.exact) - Number(a.exact) || a.len - b.len);
 
-      let exe = await findMainExe(location || "", displayName);
+  for (const cand of candidates) {
+    const { keyPath, vals } = cand;
+    const location = vals.InstallLocation || null;
+    const displayIcon = vals.DisplayIcon || null;
 
-      // Fallback: DisplayIcon geralmente aponta para o exe principal
-      // ("C:\...\app.exe,0" ou o caminho de um .ico ao lado dele).
-      if (!exe && displayIcon) {
-        const stripped = displayIcon.split(",")[0].trim().replace(/^"|"$/g, "");
-        if (stripped.toLowerCase().endsWith(".exe") && fs.existsSync(stripped)) {
-          exe = stripped;
-        } else if (fs.existsSync(stripped)) {
+    let exe = await findMainExe(location || "", displayName);
+
+    // Fallback: DisplayIcon aponta para o exe principal ("C:\...\app.exe,0").
+    if (!exe && displayIcon) {
+      const stripped = displayIcon.split(",")[0].trim().replace(/^"|"$/g, "");
+      if (fs.existsSync(stripped)) {
+        if (stripped.toLowerCase().endsWith(".exe")) exe = stripped;
+        else {
           const sibling = path.join(path.dirname(stripped), displayName.replace(/[^A-Za-z0-9]/g, "") + ".exe");
           if (fs.existsSync(sibling)) exe = sibling;
         }
       }
-
-      // Desinstalador oficial (preferência pelo modo silencioso).
-      const rawUninstaller = quietUninstallString || uninstallString || null;
-      let uninstaller = null;
-      if (rawUninstaller) {
-        // "C:\...\Uninstall X.exe" /S → extrai só o caminho do exe.
-        const exeMatch = rawUninstaller.match(/"([^"]+\.exe)"/i) || rawUninstaller.match(/^(\S+\.exe)/i);
-        if (exeMatch && fs.existsSync(exeMatch[1])) uninstaller = exeMatch[1];
-      }
-      if (!uninstaller && exe) {
-        // Instaladores NSIS padrão (electron-builder) deixam "Uninstall <App>.exe" ao lado.
-        const nsisUn = path.join(path.dirname(exe), "Uninstall " + displayName + ".exe");
-        if (fs.existsSync(nsisUn)) uninstaller = nsisUn;
-      }
-
-      return {
-        appId,
-        installed: true,
-        version: displayVersion || null,
-        location: location || null,
-        exe: exe || null,
-        uninstaller,
-        source: "registry",
-      };
     }
+
+    // Desinstalador oficial: QuietUninstallString > UninstallString > NSIS padrão.
+    let uninstaller = extractExePath(vals.QuietUninstallString) || extractExePath(vals.UninstallString) || null;
+    if (!uninstaller && exe) {
+      const nsisUn = path.join(path.dirname(exe), "Uninstall " + displayName + ".exe");
+      if (fs.existsSync(nsisUn)) uninstaller = nsisUn;
+    }
+
+    return {
+      appId,
+      installed: true,
+      version: vals.DisplayVersion || null,
+      location: location || null,
+      exe: exe || null,
+      uninstaller,
+      source: "registry",
+    };
   }
+
   return { appId, installed: false };
 }
 
@@ -152,12 +165,12 @@ async function scanInstalledApps(apps) {
     } catch {
       result = { appId: id, installed: false };
     }
-    // Fallback: pasta instalada por usuário do NSIS padrão.
+    // Fallback: pasta por usuário do NSIS padrão (registro pode não ter chave).
     if (!result.installed) {
       const localPrograms = path.join(process.env["LOCALAPPDATA"] || "", "Programs");
       const candidate = path.join(localPrograms, name);
-      if (fs.existsSync(candidate)) {
-        const exe = await findMainExe(candidate, app.name);
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isDirectory()) {
+        const exe = await findMainExe(candidate, name);
         if (exe) {
           const nsisUn = path.join(candidate, "Uninstall " + name + ".exe");
           const genericUn = path.join(candidate, "uninstall.exe");

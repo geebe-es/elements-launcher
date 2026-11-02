@@ -252,8 +252,11 @@ ipcMain.handle("download:cancel", (_event, id) => downloadManager.cancel(id));
 ipcMain.handle("download:isRunning", (_event, id) => downloadManager.isRunning(id));
 
 // --- IPC: instalações / apps ---
-ipcMain.handle("apps:scan", (_event, apps) => {
-  return scanInstalledApps(Array.isArray(apps) ? apps : []);
+ipcMain.handle("apps:scan", async (_event, apps) => {
+  logLine("apps:scan:in", { apps });
+  const results = await scanInstalledApps(Array.isArray(apps) ? apps : []);
+  logLine("apps:scan:out", { results });
+  return results;
 });
 
 // Executa um exe silenciosamente (/S); se o manifesto exigir elevação,
