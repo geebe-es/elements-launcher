@@ -57,6 +57,7 @@ declare global {
       settingsChooseDownloadDir: () => Promise<{ ok: boolean; dir?: string }>;
 
       updaterState: () => Promise<UpdaterState>;
+      appInfo: () => Promise<{ version: string }>;
       updaterCheck: () => Promise<{ ok: boolean }>;
       updaterDownload: () => Promise<{ ok: boolean }>;
       updaterInstall: () => Promise<{ ok: boolean }>;

@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   settingsChooseDownloadDir: () => ipcRenderer.invoke("settings:chooseDownloadDir"),
 
   // Auto-update do launcher
+  appInfo: () => ipcRenderer.invoke("app:info"),
   updaterState: () => ipcRenderer.invoke("updater:state"),
   updaterCheck: () => ipcRenderer.invoke("updater:check"),
   updaterDownload: () => ipcRenderer.invoke("updater:download"),

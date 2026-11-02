@@ -236,6 +236,7 @@ ipcMain.handle("settings:get", () => ({
 }));
 
 // --- IPC: auto-update do launcher ---
+ipcMain.handle("app:info", () => ({ version: app.getVersion() }));
 ipcMain.handle("updater:state", () => updaterState);
 ipcMain.handle("updater:check", () => {
   checkForUpdates();

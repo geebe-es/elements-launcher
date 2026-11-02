@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import AppIcon from "../components/AppIcon";
 import { AppStatusBadge, AppActionButton } from "../components/AppAction";
 import { APPS } from "../data/apps";
@@ -15,6 +16,11 @@ function compareSemver(a: string, b: string): number {
 
 export default function UpdatesPage() {
   const { states, lastScan, scan, updateStatus, updater, updaterInstall, updaterDownload, updaterCheck } = useLauncher();
+  const [appVersion, setAppVersion] = useState<string>("");
+
+  useEffect(() => {
+    window.electronAPI?.appInfo?.().then((info) => setAppVersion(info?.version ?? ""));
+  }, []);
 
   // Atualização pendente = instalado com versão anterior à do catálogo.
   const pending = APPS.filter((a) => {
@@ -55,7 +61,8 @@ export default function UpdatesPage() {
         <div className="row-info">
           <h4>Elements Launcher</h4>
           <p>
-            Versão atual: v1.0.0{updater.version && updater.status !== "latest" ? ` · Nova versão: v${updater.version}` : ""}
+            Versão atual:{appVersion ? ` v${appVersion}` : " —"}
+            {updater.version && updater.status !== "latest" ? ` · Nova versão: v${updater.version}` : ""}
           </p>
           {updater.status === "checking" && <p>Verificando atualizações…</p>}
           {updater.status === "downloading" && (
