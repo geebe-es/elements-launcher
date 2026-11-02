@@ -318,6 +318,10 @@ app.whenReady().then(() => {
   const win = createWindow();
   win.__splash = splash;
 
+  // Verificação automática ocasional (empacotado): ~12s após abrir,
+  // o usuário pode aceitar (ou não) a atualização na interface.
+  setTimeout(() => checkForUpdates(), 12000);
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
