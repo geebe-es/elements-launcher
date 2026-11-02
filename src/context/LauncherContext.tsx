@@ -272,7 +272,6 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     const res = await API.uninstallApp(uninstaller);
     if (res?.ok) {
       if (!res.openedWizard) {
-        // Silencioso concluído → recomputa imediatamente.
         const results = await API.scanApps?.(APPS.map((a) => ({ id: a.id, name: a.name })));
         const r = results?.[app.id];
         updateStatus(app.id, {
@@ -285,9 +284,22 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
           progress: 0,
         });
         if (r?.installed) {
-          window.alert(
-            `O ${app.name} ainda foi detectado após a desinstalação — pode ter sido reinstalado ou há outra variante instalada.`
-          );
+          // NSIS copia o desinstalador para %TEMP% e o processo original
+          // sai antes do fim: re-verificamos discretamente até o registro
+          // limpar (sem janelas).
+          const delays = [4000, 10000, 20000];
+          for (const d of delays) {
+            await new Promise((rl) => setTimeout(rl, d));
+            const again = await API.scanApps?.(APPS.map((a) => ({ id: a.id, name: a.name })));
+            const r2 = again?.[app.id];
+            updateStatus(app.id, {
+              status: r2?.installed ? "uninstalling" : "available",
+              installedVersion: r2?.installed ? r2?.version ?? app.version : null,
+              exePath: r2?.exe ?? null,
+              uninstallerPath: r2?.uninstaller ?? null,
+            });
+            if (!r2?.installed) break;
+          }
         }
       }
       // openedWizard=true: o assistente roda com o usuário; o estado será
