@@ -15,14 +15,13 @@ function compareSemver(a: string, b: string): number {
 }
 
 export default function UpdatesPage() {
-  const { states, lastScan, scan, updateStatus, updater, updaterInstall, updaterDownload, updaterCheck } = useLauncher();
+  const { states, lastScan, scan, updater, updaterInstall, updaterDownload, updaterCheck } = useLauncher();
   const [appVersion, setAppVersion] = useState<string>("");
 
   useEffect(() => {
     window.electronAPI?.appInfo?.().then((info) => setAppVersion(info?.version ?? ""));
   }, []);
 
-  // Atualização pendente = instalado com versão anterior à do catálogo.
   const pending = APPS.filter((a) => {
     const st = states[a.id];
     if (!st) return false;
@@ -32,88 +31,86 @@ export default function UpdatesPage() {
     return false;
   });
 
-  // Notifica o contexto do estado de atualização (usado pelos botões "Atualizar").
-  for (const app of pending) {
-    const before = states[app.id];
-    if (before.status !== "updateAvailable") {
-      // Marcamos via useEffect-like one-time set; chamada direta idempotente.
-      updateStatus(app.id, { status: "updateAvailable" });
-    }
-  }
-
   const lastScanLabel = lastScan
     ? `Hoje, ${lastScan.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`
     : "Nunca";
 
+  const statusText: Record<string, string> = {
+    idle: "Clique em “Verificar atualização” para conferir novas versões.",
+    checking: "Verificando atualizações…",
+    available: `Nova versão v${updater.version ?? "?"} publicada no GitHub.`,
+    downloading: "Baixando atualização…",
+    downloaded: "Atualização baixada e pronta para instalar.",
+    latest: "Você está na versão mais recente.",
+    error: updater.error || "Falha na verificação.",
+    "unavailable-dev": "A verificação funciona na versão instalada do launcher.",
+  };
+
   return (
     <section className="page-section">
       <div className="section-header">
-        <h2>🔄 Atualizações</h2>
+        <h2 className="section-title">Atualizações</h2>
         <button className="btn-action" onClick={scan}>
           Verificar atualizações
         </button>
       </div>
 
-      <div className="launcher-version-card">
-        <div className="brand-logo-footer">
-          <img src="./logo.png" alt="Elements" />
+      {/* Card hero do launcher */}
+      <div className={`updater-hero hero-${updater.status}`}>
+        <div className="updater-hero-side">
+          <img className="updater-logo" src="./logo.png" alt="" draggable={false} />
+          {updater.status === "checking" && <span className="mini-spinner overlay-spin" />}
         </div>
-        <div className="row-info">
-          <h4>Elements Launcher</h4>
-          <p>
-            Versão atual:{appVersion ? ` v${appVersion}` : " —"}
-            {updater.version && updater.status !== "latest" ? ` · Nova versão: v${updater.version}` : ""}
-          </p>
-          {updater.status === "checking" && <p>Verificando atualizações…</p>}
+
+        <div className="updater-hero-main">
+          <div className="updater-title-row">
+            <h3>Elements Launcher</h3>
+            <span className="version-badge current">v{appVersion || "—"}</span>
+            {(updater.status === "available" || updater.status === "downloaded") && updater.version && (
+              <span className="version-badge new">→ v{updater.version}</span>
+            )}
+          </div>
+          <p className={`updater-sub ${updater.status === "error" ? "modal-hash warn" : ""}`}>{statusText[updater.status]}</p>
           {updater.status === "downloading" && (
-            <div className="download-progress">
+            <div className="download-progress hero-progress" title={`${updater.progress ?? 0}%`}>
               <div className="bar" style={{ width: `${updater.progress ?? 0}%` }} />
+              <span className="hero-progress-label">{updater.progress != null ? `${updater.progress}%` : ""}</span>
             </div>
           )}
-          {updater.status === "downloaded" && <p>Atualização baixada — pronta para instalar.</p>}
-          {updater.status === "latest" && <p>Você está em dia com a versão mais recente.</p>}
-          {updater.status === "unavailable-dev" && (
-            <p>Verificação automática disponível na versão empacotada (instalada).</p>
-          )}
-          {updater.status === "error" && <p className="modal-hash warn">Falha: {updater.error || "erro desconhecido"}</p>}
         </div>
-        <div className="updater-actions">
-          {updater.status === "available" || updater.status === "downloading" ? (
-            <button className="version-tag" disabled title="Baixando atualização">
-              {updater.status === "downloading" ? `Baixando ${updater.progress != null ? `${updater.progress}%` : ""}` : "Nova versão"}
-            </button>
-          ) : null}
-          {updater.status === "downloaded" ? (
-            <button className="btn-action" onClick={updaterInstall}>
-              Reiniciar e instalar
-            </button>
-          ) : null}
-          {updater.status === "available" ? (
-            <button className="btn-action" onClick={updaterDownload}>
-              Baixar atualização
-            </button>
-          ) : null}
-          {(updater.status === "idle" ||
-            updater.status === "latest" ||
-            updater.status === "error" ||
-            updater.status === "unavailable-dev") ? (
+
+        <div className="updater-hero-actions">
+          {(updater.status === "idle" || updater.status === "latest" || updater.status === "error" || updater.status === "unavailable-dev") && (
             <button className="btn-outline" onClick={updaterCheck}>
               Verificar atualização
             </button>
-          ) : null}
+          )}
+          {updater.status === "available" && (
+            <button className="btn-action" onClick={updaterDownload}>
+              Baixar atualização
+            </button>
+          )}
+          {updater.status === "downloaded" && (
+            <button className="btn-action" onClick={updaterInstall}>
+              Reiniciar e instalar
+            </button>
+          )}
+          {updater.status === "downloading" && <button className="btn-outline" disabled>Baixando…</button>}
         </div>
       </div>
 
-      <div className="launcher-version-card">
-        <div className="row-info">
-          <h4>Última verificação</h4>
-          <p>{lastScanLabel}</p>
-        </div>
+      {/* faixa de contexto */}
+      <div className="updates-meta">
+        <span>
+          <b>Última verificação:</b> {lastScanLabel}
+        </span>
+        <span>Atualizações via GitHub Releases · integridade conferida por hash</span>
       </div>
 
-      <h3 className="subsection-title">
-        Atualizações pendentes ({pending.length})
-      </h3>
+      <div className="section-header pendings-header">
+        <h3 className="subsection-title">Aplicativos do catálogo {pending.length > 0 ? `(${pending.length} pendente${pending.length > 1 ? "s" : ""})` : ""}</h3>
+      </div>
+
       {pending.length > 0 ? (
         <div className="all-apps-list">
           {pending.map((app) => (
@@ -133,9 +130,14 @@ export default function UpdatesPage() {
           ))}
         </div>
       ) : (
-        <p className="empty-message">
-          Nenhuma atualização pendente. Seus aplicativos estão em dia com o catálogo (ou ainda não há versões instaladas).
-        </p>
+        <div className="empty-state compact-empty">
+          <span className="empty-icon">✅</span>
+          <h3>Nenhuma atualização pendente</h3>
+          <p>
+            Os aplicativos detectados neste computador estão em dia com o catálogo.
+            App ainda não instalado? Veja a página <b>Início</b>.
+          </p>
+        </div>
       )}
     </section>
   );
