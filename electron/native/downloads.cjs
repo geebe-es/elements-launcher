@@ -65,17 +65,41 @@ function createDownloadManager() {
     active.set(id, record);
 
     try {
-      const response = await fetch(parsed, {
-        signal: controller.signal,
-        redirect: "follow",
-      });
+      // Redirecionamentos validados salto a salto: cada destino novo precisa
+      // estar na lista de hosts autorizados do catálogo.
+      let response = null;
+      let currentUrl = parsed;
+      const MAX_REDIRECTS = 10;
+      for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        const res = await fetch(currentUrl, {
+          signal: controller.signal,
+          redirect: "manual",
+        });
+        if ([301, 302, 303, 307, 308].includes(res.status)) {
+          const loc = res.headers.get("location");
+          if (!loc) throw new Error("Redirecionamento sem destino informado pelo servidor.");
+          try {
+            currentUrl = new URL(loc, currentUrl);
+          } catch {
+            throw new Error("Destino de redirecionamento inválido.");
+          }
+          if (!isHostAllowed(currentUrl.hostname, allowedHosts)) {
+            throw new Error("Host de download não autorizado (em redirecionamento).");
+          }
+          continue;
+        }
+        response = res;
+        break;
+      }
+      if (!response) throw new Error("Excesso de redirecionamentos no download.");
+      const finalResponse = response;
 
-      if (!response.ok) throw new Error("Servidor respondeu com código HTTP " + response.status + ".");
+      if (!finalResponse.ok) throw new Error("Servidor respondeu com código HTTP " + finalResponse.status + ".");
 
-      const lenHeader = response.headers.get("content-length");
+      const lenHeader = finalResponse.headers.get("content-length");
       record.total = lenHeader ? Number(lenHeader) : null;
 
-      const engine = require("node:stream").Readable.fromWeb(response.body);
+      const engine = require("node:stream").Readable.fromWeb(finalResponse.body);
       const fileStream = fs.createWriteStream(destFile);
       engine.on("data", (chunk) => {
         record.received += chunk.length;

@@ -2,7 +2,7 @@
   "name": "elements-launcher",
   "productName": "Elements Launcher",
   "private": true,
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Central de aplicativos do Elements — baixe, instale e gerencie seus apps em um só lugar.",
   "main": "electron/main.cjs",
   "type": "module",

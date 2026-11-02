@@ -79,17 +79,32 @@ async function matchRegistryForName(appId, displayName) {
       const nameClean = name.toLowerCase().replace(/[^a-z0-9]/g, "");
       const targetClean = displayName.toLowerCase().replace(/[^a-z0-9]/g, "");
       if (!targetClean || !nameClean.includes(targetClean)) continue;
-      const [version, location] = await Promise.all([
+      const [displayIcon, displayVersion, location] = await Promise.all([
+        getEntryValue(keyPath, "DisplayIcon"),
         getEntryValue(keyPath, "DisplayVersion"),
         getEntryValue(keyPath, "InstallLocation"),
       ]);
-      const exe = await findMainExe(location || "", displayName);
+
+      let exe = await findMainExe(location || "", displayName);
+
+      // Fallback: DisplayIcon geralmente aponta para o exe principal
+      // ("C:\...\app.exe,0" ou o caminho de um .ico ao lado dele).
+      if (!exe && displayIcon) {
+        const stripped = displayIcon.split(",")[0].trim().replace(/^"|"$/g, "");
+        if (stripped.toLowerCase().endsWith(".exe") && fs.existsSync(stripped)) {
+          exe = stripped;
+        } else if (fs.existsSync(stripped)) {
+          const sibling = path.join(path.dirname(stripped), displayName.replace(/[^A-Za-z0-9]/g, "") + ".exe");
+          if (fs.existsSync(sibling)) exe = sibling;
+        }
+      }
+
       return {
         appId,
         installed: true,
-        version: version || null,
+        version: displayVersion || null,
         location: location || null,
-        exe,
+        exe: exe || null,
         source: "registry",
       };
     }

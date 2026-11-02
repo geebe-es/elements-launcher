@@ -1,0 +1,35 @@
+# Publica o Elements Launcher automaticamente quando uma tag v* é enviada.
+# Ex.: git tag v1.0.7 && git push --tags  →  build + release no GitHub
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Build + Empacotamento + Publicação
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: npm run release
+
+      - name: Resumo do release
+        shell: bash
+        run: gh release view "v${GITHUB_REPOSITORY##*/}" --repo "$GITHUB_REPOSITORY" || true

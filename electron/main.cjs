@@ -318,8 +318,8 @@ app.whenReady().then(() => {
   const win = createWindow();
   win.__splash = splash;
 
-  // Verificação automática ocasional (empacotado): ~12s após abrir,
-  // o usuário pode aceitar (ou não) a atualização na interface.
+  // Verificação automática no abertura (empacotado): ~12s depois de abrir,
+  // o usuário aceita (ou não) a atualização pela interface.
   setTimeout(() => checkForUpdates(), 12000);
 
   app.on("activate", () => {

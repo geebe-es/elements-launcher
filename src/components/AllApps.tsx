@@ -1,8 +1,12 @@
+import { useState } from "react";
 import AppIcon from "./AppIcon";
 import { AppStatusBadge, AppActionButton, AppProgressBar } from "./AppAction";
+import AppDetailsModal from "./AppDetailsModal";
 import { APPS, CATEGORIES, type AppInfo } from "../data/apps";
 
 export function AppRow({ app }: { app: AppInfo }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
   return (
     <div className="app-list-row">
       <AppIcon app={app} size="sm" />
@@ -18,17 +22,10 @@ export function AppRow({ app }: { app: AppInfo }) {
       <div className="row-action">
         <AppActionButton app={app} compact />
       </div>
-      <button
-        className="row-menu"
-        title="Detalhes"
-        onClick={() =>
-          window.alert(
-            `Detalhes de ${app.name}\n\nVersão: v${app.version}\nTamanho: ${app.size}\nCategoria: ${app.category}\n\n${app.longDescription}${app.downloadUrl ? "" : "\n\n⚠ Endereço de download ainda não publicado."}`
-          )
-        }
-      >
+      <button className="row-menu" title="Detalhes" onClick={() => setDetailsOpen(true)}>
         ⋮
       </button>
+      <AppDetailsModal app={detailsOpen ? app : null} onClose={() => setDetailsOpen(false)} />
     </div>
   );
 }

@@ -1,9 +1,74 @@
+import { useEffect, useState } from "react";
 import AppIcon from "./AppIcon";
 import { APPS } from "../data/apps";
 import { useLauncher } from "../context/LauncherContext";
 
+interface NewsItem {
+  repo: string;
+  appName: string;
+  version: string;
+  title: string;
+  date: Date | null;
+  url: string;
+}
+
+const NEWS_REPOS = [
+  { repo: "geebe-es/ConvertMp3", appName: "ConvertMp3" },
+  { repo: "geebe-es/Instasave", appName: "InstaSave" },
+  { repo: "geebe-es/elements-launcher", appName: "Elements Launcher" },
+];
+
+// Novidades reais: últimos releases dos projetos do catálogo (API pública do GitHub).
+export function useNews() {
+  const [news, setNews] = useState<NewsItem[] | null>(null);
+  const [state, setState] = useState<"loading" | "ok" | "offline">("loading");
+
+  useEffect(() => {
+    let alive = true;
+    Promise.allSettled(
+      NEWS_REPOS.map((r) =>
+        fetch(`https://api.github.com/repos/${r.repo}/releases?per_page=1`)
+          .then((res) => res.json().then((items) => ({ ...r, items })))
+      )
+    ).then((settled) => {
+      if (!alive) return;
+      const items: NewsItem[] = [];
+      let anyOk = false;
+      for (const s of settled) {
+        if (s.status !== "fulfilled" || !Array.isArray(s.value?.items)) continue;
+        anyOk = true;
+        for (const rel of s.value.items) {
+          if (!rel?.tag_name) continue;
+          items.push({
+            repo: s.value.repo,
+            appName: s.value.appName,
+            version: String(rel.tag_name).replace(/^v/, ""),
+            title: rel.name || rel.tag_name,
+            date: rel.published_at ? new Date(rel.published_at) : null,
+            url: rel.html_url,
+          });
+        }
+      }
+      items.sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+      setNews(items);
+      setState(anyOk ? "ok" : "offline");
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return { news, state };
+}
+
+function fmtDate(d: Date | null): string {
+  if (!d) return "";
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
 export default function RightSidebar() {
   const { states, lastScan, scan, openApp } = useLauncher();
+  const { news, state: newsState } = useNews();
 
   // Painel de Atualizações — dados reais do contexto (nada fixo/inventado)
   const installedApps = APPS.filter((a) => {
@@ -80,18 +145,53 @@ export default function RightSidebar() {
             Novidades
           </h3>
         </div>
-        <div className="news-card">
-          <div className="news-icon-wrap">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
-            </svg>
+        {newsState === "loading" ? (
+          <div className="update-item-card empty-widget">
+            <div className="update-info">
+              <p className="update-desc">Buscando novidades…</p>
+            </div>
           </div>
-          <div className="news-content">
-            <h4>Novo visual do Launcher!</h4>
-            <p>Mais moderno, mais rápido e com novas funcionalidades.</p>
-            <span className="news-date">02 de nov. de 2026 →</span>
+        ) : newsState === "offline" || !news || news.length === 0 ? (
+          <div className="update-item-card empty-widget">
+            <div className="update-info">
+              <p className="update-desc">
+                {newsState === "offline"
+                  ? "Sem conexão com o GitHub — novidades indisponíveis agora."
+                  : "Nenhum release publicado ainda."}
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="news-card real">
+            <div className="news-icon-wrap">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z" />
+              </svg>
+            </div>
+            <div className="news-content">
+              <h4>{news[0].appName} v{news[0].version}</h4>
+              <p>{news[0].title}</p>
+              <a
+                className="news-date"
+                href={news[0].url}
+                target="_blank"
+                rel="noreferrer"
+                title={news[0].url}
+              >
+                {fmtDate(news[0].date)} · Ver anúncio →
+              </a>
+            </div>
+          </div>
+        )}
+        {newsState === "ok" && news && news.length > 1 && (
+          <div className="news-more">
+            {news.slice(1, 3).map((n) => (
+              <a key={n.url} href={n.url} target="_blank" rel="noreferrer" className="news-mini">
+                <strong>{n.appName}</strong> v{n.version} · {fmtDate(n.date)}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="widget-card">
