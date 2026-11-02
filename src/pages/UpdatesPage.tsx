@@ -56,7 +56,7 @@ export default function UpdatesPage() {
 
       <div className="launcher-version-card">
         <div className="brand-logo-footer">
-          <img src="/logo.png" alt="Elements" />
+          <img src="./logo.png" alt="Elements" />
         </div>
         <div className="row-info">
           <h4>Elements Launcher</h4>

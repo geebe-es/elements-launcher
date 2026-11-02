@@ -68,7 +68,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
     <aside className="sidebar">
       <div className="brand">
         <div className="brand-logo" aria-label="Elements">
-          <img src="/logo.png" alt="Logo Elements Launcher" />
+          <img src="./logo.png" alt="Logo Elements Launcher" />
         </div>
         <div className="brand-info">
           <strong>Elements Launcher</strong>
@@ -112,7 +112,7 @@ export default function Sidebar({ page, onNavigate }: SidebarProps) {
       <div className="sidebar-footer">
         <div className="footer-logo">
               <div className="brand-logo-footer">
-                <img src="/logo.png" alt="Elements" />
+                <img src="./logo.png" alt="Elements" />
               </div>
           <span>Elements Launcher</span>
         </div>

@@ -74,7 +74,7 @@ export default function HeroBanner() {
         <span className="orbit orbit-1" aria-hidden="true" />
         <span className="orbit orbit-2" aria-hidden="true" />
         <div className="cube-icon">
-          <img src="/logo.png" alt="Logo Elements Launcher" />
+          <img src="./logo.png" alt="Logo Elements Launcher" />
         </div>
         <div className="graphic-badge">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">

@@ -28,7 +28,7 @@ export const APPS: AppInfo[] = [
     category: "Áudio",
     version: "1.0.4",
     size: "235.5 MB",
-    icon: "/icons/convertmp3.png",
+    icon: "icons/convertmp3.png",
     downloadUrl: "https://github.com/geebe-es/ConvertMp3/releases/download/v1.0.4/ConvertMp3-Setup.exe",
     sha256: "1b46b7f55ec259dae180917f86b8d11674dcd8b91d671fc145d6beeb4c5e5f74",
     allowedHosts: ["github.com", "objects.githubusercontent.com"],
@@ -46,7 +46,7 @@ export const APPS: AppInfo[] = [
     category: "Imagens e Vídeos",
     version: "1.0.0",
     size: "134.4 MB",
-    icon: "/icons/instasave.ico", // .ico original (já recortado, 16→256px)
+    icon: "icons/instasave.ico", // .ico original (já recortado, 16→256px)
     downloadUrl: "https://github.com/geebe-es/Instasave/releases/download/v1.0.0/InstaSave-Setup-1.0.0.exe",
     sha256: "6a1fbe913a905b5024dde3d1984a88718100f1805c22fe715b6ebab8767b785c",
     allowedHosts: ["github.com", "objects.githubusercontent.com"],
