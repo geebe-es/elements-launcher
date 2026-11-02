@@ -11,7 +11,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const root = path.dirname(fileURLToPath(new URL("..", import.meta.url)));
+// const here = <projeto>/scripts ; root = sobe um nível
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, "..");
 const pkg = JSON.parse(readFileSync(path.join(root, "package.json"), "utf-8"));
 const version = pkg.version;
 const tag = `v${version}`;
@@ -85,14 +87,15 @@ console.log(`  https://github.com/${repo}/releases/tag/${tag}`);
 
 function gh(args, opts = {}) {
   try {
-    return execFileSync("gh", args, { encoding: "utf-8", shell: true, stdio: opts.allowFail ? "pipe" : ["pipe", "pipe", "inherit"] });
+    // sem shell: node passa os argumentos devidamente quotados (resolvo .exe pelo PATH)
+    return execFileSync("gh", args, { encoding: "utf-8", stdio: opts.allowFail ? "pipe" : ["pipe", "pipe", "inherit"], windowsHide: true });
   } catch (err) {
     if (opts.allowFail) throw err;
     fail("`gh` falhou: " + (err.stderr || err.message));
   }
 }
 function run(cmd, args) {
-  execFileSync(cmd, args, { encoding: "utf-8", shell: true, stdio: "inherit" });
+  execFileSync(cmd, args, { encoding: "utf-8", shell: true, stdio: ["pipe", "pipe", "inherit"] });
 }
 function statSize(file) {
   return readFileSync(file).length;
