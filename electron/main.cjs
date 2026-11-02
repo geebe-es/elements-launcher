@@ -14,6 +14,10 @@ const { createDownloadManager } = require("./native/downloads.cjs");
 const { scanInstalledApps } = require("./native/installs.cjs");
 const downloadManager = createDownloadManager();
 
+// Encaminha progresso/conclusão/erro/cancelamento dos downloads nativos
+// para todas as janelas (o renderer escuta o canal "native:event").
+downloadManager.events.on("event", (event) => sendToAllWindows(event));
+
 // --- Auto-update do launcher (electron-updater) ---
 // Estado base: nada foi verificado ainda. Nada é exibido/inventado na UI
 // antes de uma verificação real acontecer.

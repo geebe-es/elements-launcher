@@ -30,13 +30,6 @@ export function AppStatusBadge({ app }: { app: AppInfo }) {
         <span className={`status-dot`} aria-hidden="true" />
       )}
       {label.text}
-      {status === "downloading" && st && st.received > 0 && (
-        <span className="dl-bytes">
-          {" · "}
-          {formatBytes(st.received)}
-          {st.total ? ` / ${formatBytes(st.total)}` : ""}
-        </span>
-      )}
     </div>
   );
 }
@@ -44,9 +37,29 @@ export function AppStatusBadge({ app }: { app: AppInfo }) {
 export function AppProgressBar({ app }: { app: AppInfo }) {
   const st = useLauncher().states[app.id];
   if (!st || st.status !== "downloading") return null;
+  const title = st.total
+    ? `${formatBytes(st.received)} de ${formatBytes(st.total)}`
+    : `${formatBytes(st.received)} baixados`;
   return (
-    <div className="download-progress" title={st.total ? `${formatBytes(st.received)} de ${formatBytes(st.total)}` : `${formatBytes(st.received)} baixados`}>
-      {st.total ? <div className="bar"><div style={{ width: `${st.progress}%` }} /></div> : <div className="bar indeterminate" />}
+    <div className="download-progress" title={title}>
+      <div className="download-progress-head">
+        <span className="dl-line">
+          <span className="mini-spinner" aria-hidden="true" />
+          {st.total
+            ? `${formatBytes(st.received)} de ${formatBytes(st.total)}`
+            : `${formatBytes(st.received)} baixados…`}
+        </span>
+        {st.total != null && (
+          <span className="download-progress-percent">{Math.round(st.progress ?? 0)}%</span>
+        )}
+      </div>
+      <div className="track">
+        {st.total != null ? (
+          <div className="bar" style={{ width: `${st.progress ?? 0}%` }} />
+        ) : (
+          <div className="bar indeterminate" />
+        )}
+      </div>
     </div>
   );
 }

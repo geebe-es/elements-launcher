@@ -71,10 +71,12 @@ function createDownloadManager() {
       let currentUrl = parsed;
       const MAX_REDIRECTS = 10;
       for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
+        if (process.env.EL_DEBUG) console.log("[dl] hop", hop, "GET", currentUrl.hostname + currentUrl.pathname.slice(0, 50));
         const res = await fetch(currentUrl, {
           signal: controller.signal,
           redirect: "manual",
         });
+        if (process.env.EL_DEBUG) console.log("[dl] hop", hop, "->", res.status, res.headers.get("location") || "(final)");
         if ([301, 302, 303, 307, 308].includes(res.status)) {
           const loc = res.headers.get("location");
           if (!loc) throw new Error("Redirecionamento sem destino informado pelo servidor.");
@@ -93,6 +95,7 @@ function createDownloadManager() {
       }
       if (!response) throw new Error("Excesso de redirecionamentos no download.");
       const finalResponse = response;
+      if (process.env.EL_DEBUG) console.log("[dl] resposta final", finalResponse.status, "len:", finalResponse.headers.get("content-length"));
 
       if (!finalResponse.ok) throw new Error("Servidor respondeu com código HTTP " + finalResponse.status + ".");
 
@@ -103,6 +106,9 @@ function createDownloadManager() {
       const fileStream = fs.createWriteStream(destFile);
       engine.on("data", (chunk) => {
         record.received += chunk.length;
+        if (process.env.EL_DEBUG && record.received % (5 * 1024 * 1024) < chunk.length) {
+          console.log("[dl] progresso", (record.received / 1048576).toFixed(1), "MB");
+        }
         events.emit("event", {
           type: "progress",
           id,
@@ -143,8 +149,10 @@ function createDownloadManager() {
       }
       active.delete(id);
       if (aborted) {
+        if (process.env.EL_DEBUG) console.log("[dl] cancelado");
         events.emit("event", { type: "cancelled", id });
       } else {
+        if (process.env.EL_DEBUG) console.log("[dl] ERRO:", err && err.stack ? err.stack.split("\n")[0] + " | " + (err.digest || "") : err);
         events.emit("event", {
           type: "error",
           id,

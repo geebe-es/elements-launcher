@@ -1118,25 +1118,86 @@ body {
 
 .dl-bytes { color: var(--text-muted); }
 
-/* Barra de progresso real */
+/* Barra de progresso real — com brilho animado e linha de contexto */
 .download-progress {
-  height: 5px;
-  border-radius: 4px;
-  background: rgba(139, 92, 246, 0.12);
-  overflow: hidden;
   margin-top: 10px;
+}
+
+.download-progress-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.download-progress-head .dl-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: dl-fade .4s ease;
+}
+
+.download-progress-percent {
+  color: #a78bfa;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.download-progress .track {
+  position: relative;
+  height: 6px;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+  overflow: hidden;
 }
 
 .download-progress .bar {
   height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
   border-radius: inherit;
-  transition: width .3s ease;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  transition: width .35s cubic-bezier(.4, 0, .2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Brilho varrendo o preenchimento */
+.download-progress .bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .38), transparent);
+  transform: translateX(-100%);
+  animation: dl-shine 1.6s ease-in-out infinite;
 }
 
 .download-progress .bar.indeterminate {
   width: 40%;
   animation: indeterminate 1.4s ease-in-out infinite;
+}
+
+/* Glow suave no card/linha enquanto baixa */
+.app-card:has(.download-progress),
+.app-list-row:has(.download-progress) {
+  border-color: rgba(139, 92, 246, .45);
+  animation: dl-glow 2s ease-in-out infinite;
+}
+
+@keyframes dl-shine {
+  to { transform: translateX(100%); }
+}
+
+@keyframes dl-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dl-glow {
+  0%, 100% { box-shadow: 0 0 0 rgba(124, 58, 237, 0); }
+  50% { box-shadow: 0 0 22px rgba(124, 58, 237, .25); }
 }
 
 @keyframes indeterminate {
@@ -1146,6 +1207,10 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .download-progress .bar.indeterminate { animation: none; width: 100%; opacity: .6; }
+  .download-progress .bar::after,
+  .app-card:has(.download-progress),
+  .app-list-row:has(.download-progress),
+  .download-progress-head .dl-line { animation: none; }
 }
 
 /* Botões auxiliares */
@@ -1347,6 +1412,10 @@ body {
   max-width: 420px;
   display: flex;
   align-items: center;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.12);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, .35);
+  overflow: hidden;
 }
 
 .hero-progress-label {

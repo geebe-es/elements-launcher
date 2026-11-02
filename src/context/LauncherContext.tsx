@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { APPS, type AppInfo } from "../data/apps";
 
 export type AppStatus =
@@ -91,12 +91,12 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const updateStatus = (id: string, patch: Partial<AppRuntimeState>) => {
+  const updateStatus = useCallback((id: string, patch: Partial<AppRuntimeState>) => {
     setStates((prev) => ({
       ...prev,
       [id]: { ...baseState(), ...(prev[id] || {}), ...patch },
     }));
-  };
+  }, []);
 
   // Varredura de instalação no Windows
   const scan = async () => {
@@ -168,7 +168,9 @@ export function LauncherProvider({ children }: { children: ReactNode }) {
       }
     });
     return off;
-  }, [states]);
+    // Inscreve UMA única vez: reinscrever a cada mudança de estados perdia
+    // eventos (ex.: "done") entre o unsubscribe e o re-subscribe.
+  }, [updateStatus]);
 
   const download = (app: AppInfo) => {
     if (!API?.downloadStart) {
