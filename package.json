@@ -1,21 +1,63 @@
 {
-  "name": "tauri-app",
+  "name": "elements-launcher",
+  "productName": "Elements Launcher",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Central de aplicativos do Elements — baixe, instale e gerencie seus apps em um só lugar.",
+  "main": "electron/main.cjs",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node scripts/dev.mjs",
     "build": "tsc && vite build",
-    "preview": "vite preview",
-    "tauri": "tauri"
+    "start": "electron .",
+    "dist": "npm run build && electron-builder --win nsis portable --x64"
   },
   "dependencies": {
-    "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2"
+    "electron-updater": "^6.8.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2",
-		"vite": "^8.0.16",
-    "typescript": "~6.0.3"
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "electron": "^45.2.1",
+    "electron-builder": "^26.15.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.0.16"
+  },
+  "build": {
+    "appId": "com.elements.launcher",
+    "productName": "Elements Launcher",
+    "directories": {
+      "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "geebe-es",
+      "repo": "elements-launcher"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/logo.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "Elements-Launcher-Setup.exe"
+    },
+    "portable": {
+      "artifactName": "Elements-Launcher-Portable.exe"
+    }
   }
 }

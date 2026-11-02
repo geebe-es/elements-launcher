@@ -38,7 +38,7 @@ body {
   width: 100vw;
 }
 
-/* Topbar */
+/* Topbar — área de arraste da janela sem moldura */
 .topbar {
   height: 52px;
   background: var(--sidebar-bg);
@@ -48,6 +48,12 @@ body {
   justify-content: space-between;
   padding: 0 20px;
   flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+
+.search-box,
+.topbar-actions {
+  -webkit-app-region: no-drag;
 }
 
 .search-box {
@@ -149,20 +155,30 @@ body {
 }
 
 .brand-logo {
-  width: 38px;
-  height: 38px;
-  background: linear-gradient(135deg, #7c3aed, #4f46e5);
-  border-radius: 10px;
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
-  color: white;
-  box-shadow: 0 0 20px var(--primary-glow);
+  flex-shrink: 0;
+}
+
+.brand-logo img,
+.brand-logo-footer img,
+.cube-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.brand-logo img {
+  filter: drop-shadow(0 4px 14px rgba(124, 58, 237, 0.35));
 }
 
 .brand-info strong {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
+  letter-spacing: -0.3px;
 }
 
 .brand-info span {
@@ -279,11 +295,18 @@ body {
 /* Content Area */
 .content-area {
   flex: 1;
+  min-width: 0; /* permite o conteúdo encolher sem transbordar */
   overflow-y: auto;
   padding: 24px 32px;
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+/* Impede que os blocos sejam comprimidos verticalmente:
+   em vez disso, a área central ganha rolagem. */
+.content-area > * {
+  flex-shrink: 0;
 }
 
 .content-area::-webkit-scrollbar {
@@ -297,101 +320,218 @@ body {
 
 /* Hero Banner */
 .hero-banner {
-  background: linear-gradient(135deg, #17132b 0%, #100d1d 100%);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 28px 36px;
+  background:
+    radial-gradient(ellipse 55% 110% at 88% 30%, rgba(124, 58, 237, 0.30) 0%, transparent 62%),
+    radial-gradient(ellipse 42% 90% at 70% 110%, rgba(99, 102, 241, 0.16) 0%, transparent 65%),
+    radial-gradient(ellipse 40% 80% at 8% -10%, rgba(139, 92, 246, 0.10) 0%, transparent 60%),
+    linear-gradient(135deg, #16102e 0%, #0e0c1a 100%);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  border-radius: 20px;
+  padding: 30px 38px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  min-height: 190px;
+  box-shadow:
+    0 14px 40px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Auroras decorativas — CSS puro */
+.hero-aurora {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.hero-aurora.a1 {
+  width: 340px;
+  height: 340px;
+  right: -40px;
+  top: -140px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.30) 0%, transparent 62%);
+  filter: blur(4px);
+}
+
+.hero-aurora.a2 {
+  width: 260px;
+  height: 260px;
+  left: 22%;
+  bottom: -170px;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.18) 0%, transparent 60%);
+  filter: blur(4px);
+}
+
+/* Grade sutil de fundo */
+.hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: radial-gradient(ellipse 70% 80% at 75% 50%, black 0%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 80% at 75% 50%, black 0%, transparent 75%);
 }
 
 .hero-text {
-  max-width: 520px;
+  max-width: 540px;
+  position: relative;
+  z-index: 1;
 }
 
 .hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 1.5px;
-  color: #a78bfa;
-  margin-bottom: 8px;
-  display: block;
+  letter-spacing: 2.2px;
+  color: #b4a3f5;
+  margin-bottom: 10px;
+}
+
+.eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a78bfa;
+  box-shadow: 0 0 10px #a78bfa;
 }
 
 .hero-text h1 {
-  font-size: 32px;
+  font-size: 38px;
   font-weight: 800;
-  letter-spacing: -1px;
+  letter-spacing: -1.4px;
   margin-bottom: 10px;
 }
 
 .hero-text h1 span {
-  color: #a78bfa;
+  background: linear-gradient(98deg, #c4b5fd 0%, #a78bfa 30%, #8b5cf6 62%, #818cf8 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
 }
 
 .hero-text p {
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 1.5;
-  margin-bottom: 20px;
+  color: #a8a4bd;
+  font-size: 13.5px;
+  line-height: 1.65;
+  margin-bottom: 22px;
+  max-width: 480px;
 }
 
 .hero-features {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
 }
 
 .feature-tag {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11px;
-  color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border);
-  padding: 6px 12px;
+  gap: 9px;
+  font-size: 12px;
+  color: #cbc7dd;
+  background: rgba(139, 92, 246, 0.07);
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  padding: 7px 13px 7px 8px;
+  border-radius: 11px;
+  transition: border-color .2s, background .2s;
+}
+
+.feature-tag:hover {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(139, 92, 246, 0.12);
+}
+
+.feature-icon {
+  width: 24px;
+  height: 24px;
   border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(139, 92, 246, 0.18);
+  border: 1px solid rgba(139, 92, 246, 0.30);
+  color: #c4b5fd;
+  flex-shrink: 0;
 }
 
 .hero-graphic {
   position: relative;
-  width: 140px;
-  height: 140px;
+  width: 230px;
+  height: 200px;
   display: grid;
   place-items: center;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.3) 0%, transparent 70%);
+  z-index: 1;
+  flex-shrink: 0; /* a logo não pode ser achatada/apagada */
+}
+
+/* Anéis orbitais atrás da logo */
+.orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgba(139, 92, 246, 0.22);
+  pointer-events: none;
+}
+
+.orbit-1 {
+  width: 210px;
+  height: 210px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.10) 0%, transparent 65%);
+}
+
+.orbit-2 {
+  width: 260px;
+  height: 170px;
+  transform: rotate(-24deg);
+  border-color: rgba(129, 140, 248, 0.14);
+  border-style: dashed;
 }
 
 .cube-icon {
-  width: 72px;
-  height: 72px;
-  background: linear-gradient(135deg, #8b5cf6, #4f46e5);
-  border-radius: 16px;
+  width: 118px;
+  height: 118px;
   display: grid;
   place-items: center;
-  font-size: 32px;
-  font-weight: 800;
-  color: white;
-  box-shadow: 0 0 30px var(--primary-glow);
-  transform: rotate(8deg);
+  z-index: 1;
+  animation: hero-float 6s ease-in-out infinite;
+  filter: drop-shadow(0 16px 38px rgba(109, 40, 217, 0.50));
+}
+
+@keyframes hero-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-9px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cube-icon { animation: none; }
 }
 
 .graphic-badge {
   position: absolute;
-  top: -10px;
-  right: -30px;
-  background: #1f1938;
-  border: 1px solid var(--border);
-  font-size: 10px;
-  padding: 4px 10px;
-  border-radius: 8px;
-  color: #a78bfa;
+  bottom: 4px;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 8px 13px;
+  border-radius: 11px;
+  background: rgba(22, 17, 43, 0.85);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  color: #c4b5fd;
   white-space: nowrap;
+  z-index: 2;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+.graphic-badge svg {
+  color: #a78bfa;
 }
 
 /* Sections */
@@ -843,4 +983,591 @@ body {
   background: var(--primary);
   width: 16px;
   border-radius: 99px;
+}
+
+/* ===== Responsividade — janelas menores ===== */
+
+/* Featured: grade fluida em vez de 2 colunas fixas */
+.featured-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 16px;
+}
+
+.hero-banner {
+  flex-wrap: wrap;
+  gap: 4px 28px;
+}
+
+.hero-text {
+  flex: 1 1 380px;
+}
+
+/* Até ~1300px: banner muda deixo de altura fixa e a logo encolhe */
+@media (max-width: 1300px) {
+  .hero-banner {
+    padding: 24px 28px;
+    min-height: 0;
+    gap: 4px 20px;
+  }
+  .hero-text h1 {
+    font-size: 30px;
+  }
+  .hero-text p {
+    margin-bottom: 16px;
+  }
+  .hero-graphic {
+    width: 175px;
+    height: 165px;
+  }
+  .cube-icon {
+    width: 88px;
+    height: 88px;
+  }
+  .orbit-1 {
+    width: 165px;
+    height: 165px;
+  }
+  .orbit-2 {
+    width: 205px;
+    height: 135px;
+  }
+  .graphic-badge {
+    bottom: 0;
+  }
+}
+
+/* Até ~1180px: sidebar de widgets sai (seus dados continuam na página Atualizações) */
+@media (max-width: 1180px) {
+  .right-sidebar {
+    display: none;
+  }
+}
+
+/* Até ~1020px: banner empilha (texto acima, logo abaixo) */
+@media (max-width: 1020px) {
+  .hero-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .hero-graphic {
+    width: 100%;
+    height: 140px;
+    align-self: center;
+  }
+  .hero-grid {
+    mask-image: radial-gradient(ellipse 60% 90% at 70% 0%, black 0%, transparent 75%);
+    -webkit-mask-image: radial-gradient(ellipse 60% 90% at 70% 0%, black 0%, transparent 75%);
+  }
+}
+
+/* Linhas da lista: esconde colunas secundárias progressivamente */
+@media (max-width: 1220px) {
+  .row-category {
+    display: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .row-version {
+    display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .row-info p {
+    display: none;
+  }
+  .row-status {
+    color: var(--success);
+    font-size: 10px;
+  }
+  .content-area {
+    padding: 18px 20px;
+  }
+  .main-scroll,
+  .content-area {
+    gap: 18px;
+  }
+}
+
+/* App settings etc. permanecem */
+.filter-tabs {
+  flex-wrap: wrap;
+}
+
+/* ===== Estado visual dos apps / downloads ===== */
+.status-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.status-badge .status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.label-violet { color: #a78bfa; } .label-violet .status-dot { background: #a78bfa; box-shadow: 0 0 8px #a78bfa66; }
+.label-sky { color: #7dd3fc; }  .label-sky .status-dot { background: #7dd3fc; box-shadow: 0 0 8px #7dd77166; }
+.label-green { color: #34d399; } .label-green .status-dot { background: #34d399; box-shadow: 0 0 8px #34d39966; }
+.label-amber { color: #fbbf24; } .label-amber .status-dot { background: #fbbf24; }
+.label-red { color: #f87171; } .label-red .status-dot { background: #f87171; }
+
+.dl-bytes { color: var(--text-muted); }
+
+/* Barra de progresso real */
+.download-progress {
+  height: 5px;
+  border-radius: 4px;
+  background: rgba(139, 92, 246, 0.12);
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.download-progress .bar {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6, #a78bfa);
+  border-radius: inherit;
+  transition: width .3s ease;
+}
+
+.download-progress .bar.indeterminate {
+  width: 40%;
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+
+@keyframes indeterminate {
+  0% { margin-left: -40%; }
+  100% { margin-left: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .download-progress .bar.indeterminate { animation: none; width: 100%; opacity: .6; }
+}
+
+/* Botões auxiliares */
+.btn-soft {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #c4b5fd;
+}
+
+.btn-soft:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.22);
+}
+
+.btn-soft:disabled {
+  opacity: .55;
+  cursor: default;
+}
+
+.action-group { display: flex; gap: 8px; }
+
+.mini-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(139, 92, 246, 0.25);
+  border-top-color: #a78bfa;
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
+.text-mini-btn {
+  background: none;
+  border: none;
+  color: #a78bfa;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 0;
+}
+
+/* Modal de confirmação de instalador */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(4, 2, 12, 0.7);
+  display: grid;
+  place-items: center;
+  animation: fade-in .18s ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-card {
+  width: min(520px, 92vw);
+  background: #17132b;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .6);
+}
+
+.modal-card h3 {
+  font-size: 17px;
+  margin-bottom: 14px;
+}
+
+.modal-card p {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.modal-card strong { color: var(--text); }
+
+.modal-path {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-hash.ok { color: #34d399; }
+.modal-hash.warn { color: #fbbf24; }
+
+.modal-note { margin-top: 10px; }
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+/* Auto-update do launcher (card de versão) */
+.updater-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.updater-actions .version-tag {
+  cursor: default;
+}
+
+.launcher-version-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+/* Notas e widgets */
+.page-note {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.empty-widget { background: transparent; border-style: dashed; }
+
+
+/* Pages (Library, Updates, Settings) */
+.page-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.empty-message {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 24px;
+  text-align: center;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 60px 20px;
+  background: var(--card-bg);
+  border: 1px dashed var(--border);
+  border-radius: 16px;
+}
+
+.empty-icon {
+  font-size: 42px;
+  margin-bottom: 6px;
+}
+
+.empty-state h3 {
+  font-size: 15px;
+}
+
+.empty-state p {
+  color: var(--text-muted);
+  max-width: 380px;
+}
+
+.pending-note {
+  font-size: 11px;
+  color: #f0b95a;
+}
+
+.launcher-version-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.subsection-title {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.version-new {
+  color: #a78bfa;
+}
+
+.status-available {
+  color: #a78bfa;
+  font-size: 11px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 18px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.setting-row:last-child {
+  border-bottom: none;
+}
+
+.setting-row h4 {
+  font-size: 13px;
+  margin-bottom: 3px;
+}
+
+.setting-row p {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  border-color: var(--primary);
+}
+
+.toggle {
+  appearance: none;
+  width: 38px;
+  height: 21px;
+  border-radius: 99px;
+  background: #3b3354;
+  position: relative;
+  cursor: pointer;
+  outline: none;
+  transition: background .2s;
+}
+
+.toggle:before {
+  content: '';
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  transition: transform .2s;
+}
+
+.toggle:checked {
+  background: var(--primary);
+}
+
+.toggle:checked:before {
+  transform: translateX(17px);
+}
+
+.search-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 0 2px;
+}
+
+.search-clear:hover {
+  color: var(--text);
+}
+
+/* ===== Identidade fiel ao mock ===== */
+
+/* Títulos de seção com ícone */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+}
+
+.section-title svg:first-child {
+  color: #fff;
+}
+
+/* Ícones de aplicativo */
+.app-icon-branded {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+}
+
+.app-icon-branded img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* Quando o ícone real (PNG) carrega, ele já traz visual/sombra próprios:
+   sem gradiente de fundo para não "vazar" nos cantos transparentes. */
+.app-icon-branded.has-img {
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Fallback (quando o ícone real não carrega) */
+.app-icon-branded.app-icon-fallback span {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.app-icon-branded.icon-sm.app-icon-fallback span {
+  font-size: 16px;
+}
+
+.app-icon-branded.icon-sm {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+
+.app-convertmp3 {
+  background: linear-gradient(160deg, #a78bfa 0%, #8b5cf6 40%, #6d28d9 100%);
+  box-shadow: 0 8px 24px rgba(109, 40, 217, 0.35);
+}
+
+.app-intasave {
+  background: linear-gradient(45deg, #f59e0b 0%, #ec4899 30%, #a855f7 90%);
+  box-shadow: 0 8px 24px rgba(236, 72, 153, 0.3);
+}
+
+.app-convertmp3 svg {
+  background: transparent;
+  transition: transform .2s;
+}
+
+.app-card:hover .app-convertmp3 svg {
+  transform: scale(1.08);
+}
+
+/* Rodapé da sidebar e card do launcher */
+.brand-logo-footer {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+/* Títulos dos widgets com ícone */
+.widget-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+/* Botões de janela minimalistas como no mock */
+.window-controls {
+  display: flex;
+  gap: 2px;
+  margin-left: 10px;
+}
+
+.win-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  border-radius: 8px;
+  width: 34px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+
+.win-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text);
+}
+
+.win-btn.close:hover {
+  background: #e81123;
+  color: white;
+}
+
+/* Promo card da sidebar igual ao mock (ícone bolt em quadrado violeta) */
+.promo-icon {
+  color: #a78bfa;
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: rgba(124, 58, 237, 0.15);
+  border: 1px solid rgba(124, 58, 237, 0.35);
+  border-radius: 10px;
 }
