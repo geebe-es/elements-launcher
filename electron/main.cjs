@@ -143,7 +143,10 @@ function createWindow() {
     },
   });
 
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => {
+    win.__readyAt = Date.now();
+    if (win.__splash) revealMainWindow(win.__splash, win);
+  });
 
   if (DEV_SERVER_URL) {
     win.loadURL(DEV_SERVER_URL);
@@ -152,6 +155,40 @@ function createWindow() {
   }
 
   return win;
+}
+
+// Splash screen: HTML/CSS puro, abre quase instantâneo antes do React subir.
+function createSplash() {
+  const splash = new BrowserWindow({
+    width: 400,
+    height: 480,
+    frame: false,
+    resizable: false,
+    movable: true,
+    center: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: "#0b0914",
+  });
+  splash.loadFile(path.join(__dirname, "splash.html"));
+  return splash;
+}
+
+// Fecha a splash mostrando a janela principal; tempo mínimo evita "piscada".
+function revealMainWindow(splash, win) {
+  const MIN_SPLASH_MS = 900;
+  if (!splash || splash.isDestroyed() || splash.__closed) return;
+  splash.__closed = true;
+  const reveal = () => {
+    if (win && !win.isDestroyed()) win.show();
+    if (!splash.isDestroyed()) splash.close();
+  };
+  const elapsed = Date.now() - (splash.__startedAt || 0);
+  setTimeout(reveal, Math.max(0, MIN_SPLASH_MS - elapsed));
+  // Redundância: nunca deixar a splash presa se algo falhar no renderer.
+  setTimeout(() => {
+    if (!splash.isDestroyed()) splash.close();
+  }, 20000);
 }
 
 // --- IPC: controles de janela ---
@@ -276,7 +313,10 @@ ipcMain.handle("settings:chooseDownloadDir", async (event) => {
 
 app.whenReady().then(() => {
   initAutoUpdater();
-  createWindow();
+  const splash = createSplash();
+  splash.__startedAt = Date.now();
+  const win = createWindow();
+  win.__splash = splash;
 
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
